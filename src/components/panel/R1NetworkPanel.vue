@@ -1,22 +1,22 @@
 <template>
   <div class="r1">
     <div class="section-header">
-      <h2>Network</h2>
-      <span class="text-muted">R1 — Load &amp; visualize</span>
+      <h2>Red</h2>
+      <span class="text-muted">R1 — Cargar y visualizar</span>
     </div>
 
     <!-- Load button -->
     <div class="load-row">
       <button class="btn btn-primary" :disabled="graphStore.loading" @click="load">
-        <span v-if="graphStore.loading">Loading…</span>
-        <span v-else>{{ graphStore.isLoaded ? '↺ Reload network' : '⬆ Load network' }}</span>
+        <span v-if="graphStore.loading">Cargando…</span>
+        <span v-else>{{ graphStore.isLoaded ? '↺ Recargar red' : '⬆ Cargar red' }}</span>
       </button>
       <div v-if="graphStore.summary" class="status-chips">
-        <span class="chip">{{ graphStore.summary.node_count }} nodes</span>
-        <span class="chip">{{ graphStore.summary.edge_count }} edges</span>
+        <span class="chip">{{ graphStore.summary.node_count }} nodos</span>
+        <span class="chip">{{ graphStore.summary.edge_count }} enlaces</span>
         <span class="chip chip-blue">{{ graphStore.summary.hub_count }} hubs</span>
         <span v-if="graphStore.summary.blocked_edge_count" class="chip chip-red">
-          {{ graphStore.summary.blocked_edge_count }} blocked
+          {{ graphStore.summary.blocked_edge_count }} bloqueadas
         </span>
       </div>
     </div>
@@ -26,10 +26,10 @@
     <!-- Airport list -->
     <div v-if="graphStore.airports.length" class="airport-section">
       <div class="filter-row">
-        <input v-model="search" class="input" placeholder="Search airport…" />
+        <input v-model="search" class="input" placeholder="Buscar aeropuerto…" />
         <label class="checkbox-label">
           <input v-model="hubOnly" type="checkbox" />
-          Hubs only
+          Sólo hubs
         </label>
       </div>
 
@@ -54,7 +54,7 @@
 
     <div v-else-if="!graphStore.loading" class="empty">
       <div class="empty-icon">🗺</div>
-      <div>Load the network to see airports and routes on the map.</div>
+      <div>Carga la red para ver aeropuertos y rutas en el mapa.</div>
     </div>
   </div>
 </template>

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { dynamicApi } from '@/api'
+import realtime from '@/realtime'
 import type { SessionState, FlightOption, ActivityOption, JobOption, FlyResult, Suggestion } from '@/types'
 
 export const useSessionStore = defineStore('session', () => {
@@ -25,7 +26,8 @@ export const useSessionStore = defineStore('session', () => {
     try {
       session.value = await dynamicApi.start({ origin, initial_budget: budget, time_hours: hours })
       initialBudget.value = budget
-      eventLog.value = [`Trip started at ${origin} — $${budget} / ${hours}h`]
+      eventLog.value = [`Viaje iniciado en ${origin} — $${budget} / ${hours}h`]
+      // session started; UI may choose to connect to realtime to receive live events
       await _refreshAll()
     } catch (e: any) { error.value = e.message }
     finally { loading.value = false }
@@ -43,6 +45,8 @@ export const useSessionStore = defineStore('session', () => {
       if (r.mandatory_events.length) eventLog.value.push(...r.mandatory_events)
       eventLog.value.push(`✈ ${r.segment.origin} → ${r.segment.dest}  $${r.segment.cost_usd.toFixed(2)}`)
       await _refreshAll()
+      // emit animate-flight event for map to animate an airplane along the segment
+      try { realtime.emit('animate-flight', { segment: r.segment }) } catch {}
       return r
     } catch (e: any) { error.value = e.message; return null }
     finally { loading.value = false }
@@ -55,7 +59,7 @@ export const useSessionStore = defineStore('session', () => {
       const r = await dynamicApi.activity({ session_id: sessionId.value, activity_name: name })
       session.value!.budget_remaining     = r.budget_remaining
       session.value!.time_remaining_hours = r.time_remaining_hours
-      eventLog.value.push(`🎯 Activity: ${name}  -$${r.cost_usd.toFixed(2)}`)
+      eventLog.value.push(`🎯 Actividad: ${name}  -$${r.cost_usd.toFixed(2)}`)
       await _refreshAll()
     } catch (e: any) { error.value = e.message }
     finally { loading.value = false }
@@ -68,7 +72,7 @@ export const useSessionStore = defineStore('session', () => {
       const r = await dynamicApi.job({ session_id: sessionId.value, job_name, hours })
       session.value!.budget_remaining     = r.budget_remaining
       session.value!.time_remaining_hours = r.time_remaining_hours
-      eventLog.value.push(`💼 Job: ${job_name} ${hours}h  +$${r.income_usd.toFixed(2)}`)
+      eventLog.value.push(`💼 Trabajo: ${job_name} ${hours}h  +$${r.income_usd.toFixed(2)}`)
       await _refreshAll()
     } catch (e: any) { error.value = e.message }
     finally { loading.value = false }
@@ -77,7 +81,7 @@ export const useSessionStore = defineStore('session', () => {
   async function endTrip() {
     if (!sessionId.value) return
     await dynamicApi.end(sessionId.value)
-    eventLog.value.push('🏁 Trip ended')
+    eventLog.value.push('🏁 Viaje finalizado')
   }
 
   async function _refreshAll() {

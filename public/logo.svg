@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="64" viewBox="0 0 320 64">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0" stop-color="#4fb3ff"/>
+      <stop offset="1" stop-color="#9fd3ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="none" />
+  <!-- simple plane icon -->
+  <g transform="translate(8,8)">
+    <path d="M6 2 L18 8 L22 10 L20 12 L16 11 L10 14 L9 12 L12 10 L6 2 Z" fill="url(#g)" stroke="#2b9cff" stroke-width="0.6"/>
+  </g>
+  <!-- text -->
+  <g transform="translate(60,40)">
+    <text x="0" y="0" font-family="Segoe UI, Arial" font-size="20" fill="#2b6ea3">Sky</text>
+    <text x="48" y="0" font-family="Segoe UI, Arial" font-size="20" fill="#9fd3ff">Route</text>
+    <text x="0" y="18" font-family="Segoe UI, Arial" font-size="10" fill="#9fbccf">PLANNER</text>
+  </g>
+</svg>

@@ -1,7 +1,6 @@
 <template>
   <div class="map-root">
-    <div ref="leafletEl" class="leaflet-map" />
-    <canvas ref="cytoscapeEl" class="cytoscape-overlay" />
+    <div ref="leafletEl" class="leaflet-map"></div>
     <!-- Airport popup -->
     <Transition name="fade">
       <AirportPopup v-if="selectedAirport" :airport="selectedAirport" @close="uiStore.selectAirport(null)" />
@@ -13,52 +12,30 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import cytoscape from 'cytoscape'
 import { useGraphStore } from '@/stores/graph.store'
 import { useSessionStore } from '@/stores/session.store'
 import { useUiStore } from '@/stores/ui.store'
 import { AIRPORT_COORDS } from '@/types'
 import AirportPopup from './AirportPopup.vue'
+import realtime from '@/realtime'
 
-const leafletEl   = ref<HTMLElement>()
-const cytoscapeEl = ref<HTMLCanvasElement>()
+const leafletEl   = ref<HTMLElement | null>(null)
 
 const graphStore   = useGraphStore()
 const sessionStore = useSessionStore()
 const uiStore      = useUiStore()
 
 let map: L.Map | null = null
-let cy:  cytoscape.Core | null = null
+let nodesLayer: L.LayerGroup | null = null
+let edgesLayer: L.LayerGroup | null = null
 
 const selectedAirport = computed(() =>
   uiStore.selectedAirport ? graphStore.airportMap[uiStore.selectedAirport] : null
 )
 
 // ── Build Cytoscape elements from store ──────────────────────────────────────
-function buildElements() {
-  const nodes = graphStore.airports.map(a => ({
-    data: {
-      id: a.id, label: a.id, isHub: a.is_hub,
-      current: a.id === sessionStore.session?.current_airport,
-      visited: sessionStore.session?.visited.includes(a.id) ?? false,
-    },
-  }))
-
-  const edges = graphStore.routes.map(r => ({
-    data: {
-      id: `${r.origin}-${r.dest}`,
-      source: r.origin, target: r.dest,
-      blocked: graphStore.isEdgeBlocked(r.origin, r.dest),
-      subsidized: r.is_subsidized,
-      highlighted: isEdgeHighlighted(r.origin, r.dest),
-    },
-  }))
-
-  return [...nodes, ...edges]
-}
-
 function isEdgeHighlighted(o: string, d: string) {
-  const path = uiStore.highlightedPath
+  const path = uiStore.highlightedPath || []
   for (let i = 0; i < path.length - 1; i++) {
     if (path[i] === o && path[i + 1] === d) return true
   }
@@ -66,11 +43,10 @@ function isEdgeHighlighted(o: string, d: string) {
 }
 
 // ── Cytoscape layout using real lat/lng ─────────────────────────────────────
-function nodePosition(id: string) {
+function nodeLatLng(id: string) {
   const coords = AIRPORT_COORDS[id]
-  if (!coords || !map) return { x: 0, y: 0 }
-  const point = map.latLngToContainerPoint(L.latLng(coords[0], coords[1]))
-  return { x: point.x, y: point.y }
+  if (!coords) return null
+  return L.latLng(coords[0], coords[1])
 }
 
 // ── Initialize map ───────────────────────────────────────────────────────────
@@ -85,176 +61,123 @@ function initLeaflet() {
     maxZoom: 18,
   }).addTo(map)
 
-  map.on('moveend zoomend', updateCyPositions)
-  map.on('resize', updateCyPositions)
+  nodesLayer = L.layerGroup().addTo(map)
+  edgesLayer = L.layerGroup().addTo(map)
+
+  map.on('moveend zoomend', () => { /* nothing needed; markers are geo-based */ })
+  map.on('resize', () => { /* noop */ })
 }
 
 // ── Initialize Cytoscape ─────────────────────────────────────────────────────
-function initCytoscape() {
-  if (!cytoscapeEl.value) return
+function renderGraph() {
+  if (!map || !nodesLayer || !edgesLayer) return
+  nodesLayer.clearLayers(); edgesLayer.clearLayers()
 
-  cy = cytoscape({
-    container: cytoscapeEl.value,
-    elements: [],
-    style: [
-      {
-        selector: 'node',
-        style: {
-          'background-color': '#1a2233',
-          'border-color': '#1e6bff',
-          'border-width': 1.5,
-          'width': 28, 'height': 28,
-          'label': 'data(label)',
-          'color': '#e2e8f0',
-          'font-size': '10px',
-          'font-family': 'Space Grotesk, sans-serif',
-          'font-weight': '600',
-          'text-valign': 'bottom',
-          'text-margin-y': 4,
-          'text-background-color': '#0a0c10',
-          'text-background-opacity': 0.8,
-          'text-background-padding': '2px',
-          'text-background-shape': 'roundrectangle',
-        },
-      },
-      {
-        selector: 'node[?isHub]',
-        style: {
-          'background-color': '#0d2a5e',
-          'border-color': '#3b82f6',
-          'border-width': 2.5,
-          'width': 36, 'height': 36,
-          'font-size': '11px',
-        },
-      },
-      {
-        selector: 'node[?current]',
-        style: {
-          'background-color': '#1d4ed8',
-          'border-color': '#60a5fa',
-          'border-width': 3,
-          'width': 40, 'height': 40,
-        },
-      },
-      {
-        selector: 'node[?visited]',
-        style: {
-          'background-color': '#14352b',
-          'border-color': '#10b981',
-          'border-width': 2,
-        },
-      },
-      {
-        selector: 'edge',
-        style: {
-          'width': 1,
-          'line-color': '#1e2d45',
-          'target-arrow-color': '#1e2d45',
-          'target-arrow-shape': 'triangle',
-          'arrow-scale': 0.6,
-          'curve-style': 'bezier',
-          'opacity': 0.6,
-        },
-      },
-      {
-        selector: 'edge[?blocked]',
-        style: {
-          'line-color': '#ef4444',
-          'target-arrow-color': '#ef4444',
-          'line-style': 'dashed',
-          'line-dash-pattern': [6, 4],
-          'opacity': 0.9,
-          'width': 2,
-        },
-      },
-      {
-        selector: 'edge[?highlighted]',
-        style: {
-          'line-color': '#1e6bff',
-          'target-arrow-color': '#1e6bff',
-          'width': 3,
-          'opacity': 1,
-        },
-      },
-      {
-        selector: 'edge[?subsidized]',
-        style: {
-          'line-color': '#10b981',
-          'target-arrow-color': '#10b981',
-          'line-style': 'dashed',
-          'line-dash-pattern': [4, 3],
-          'opacity': 0.7,
-        },
-      },
-      {
-        selector: ':selected',
-        style: { 'border-color': '#f59e0b', 'border-width': 3 },
-      },
-    ],
-    layout: { name: 'preset', positions: {} },
-    userZoomingEnabled: false,
-    userPanningEnabled: false,
-    boxSelectionEnabled: false,
-    autoungrabify: true,
-  })
+  const bounds: L.LatLngExpression[] = []
 
-  cy.on('tap', 'node', (e) => {
-    uiStore.selectAirport(e.target.data('id'))
-  })
-  cy.on('tap', (e) => {
-    if (e.target === cy) uiStore.selectAirport(null)
-  })
+  // draw edges first (so markers on top)
+  for (const r of graphStore.routes) {
+    const a = nodeLatLng(r.origin)
+    const b = nodeLatLng(r.dest)
+    if (!a || !b) continue
+    bounds.push(a, b)
+    const pts = [a, b]
+    const blocked = graphStore.isEdgeBlocked(r.origin, r.dest)
+    const highlighted = isEdgeHighlighted(r.origin, r.dest)
+    const color = highlighted ? '#1e6bff' : blocked ? '#ef4444' : (r.is_subsidized ? '#10b981' : '#1e2d45')
+    const weight = highlighted ? 3 : 1
+    const dashArray: string | undefined = blocked || r.is_subsidized ? '6,4' : undefined
+    L.polyline(pts as any, { color, weight, dashArray }).addTo(edgesLayer)
+  }
+
+  for (const a of graphStore.airports) {
+    const latlng = nodeLatLng(a.id)
+    if (!latlng) continue
+    bounds.push(latlng)
+    const isCurrent = sessionStore.session?.current_airport === a.id
+    const marker = L.circleMarker(latlng, {
+      radius: isCurrent ? 8 : (a.is_hub ? 6 : 5),
+      color: isCurrent ? '#f59e0b' : '#1e6bff',
+      fillColor: isCurrent ? '#f59e0b' : '#1a2233',
+      fillOpacity: 1,
+      weight: 2,
+    })
+    marker.on('click', () => uiStore.selectAirport(a.id))
+    marker.bindTooltip(`${a.id} — ${a.city}`, { direction: 'top' })
+    marker.addTo(nodesLayer)
+  }
+
+  // zoom to bounds if available
+  if (bounds.length && map) {
+    try { map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40] }) } catch {}
+  }
 }
 
 // ── Sync Cytoscape node positions to Leaflet projection ─────────────────────
-function updateCyPositions() {
-  if (!cy || !map) return
-  const w = leafletEl.value!.clientWidth
-  const h = leafletEl.value!.clientHeight
-  cy.resize()
-
-  cy.nodes().forEach(node => {
-    const pos = nodePosition(node.id())
-    node.position(pos)
-  })
-
-  cy.fit(undefined, 0)
-  cy.zoom({ level: 1, renderedPosition: { x: w / 2, y: h / 2 } })
-}
-
-// ── Load graph data into Cytoscape ──────────────────────────────────────────
-function renderGraph() {
-  if (!cy) return
-  cy.elements().remove()
-  cy.add(buildElements())
-  updateCyPositions()
-}
-
-// ── Watchers ─────────────────────────────────────────────────────────────────
+// Watchers
 watch(() => graphStore.airports.length, (n) => { if (n > 0) renderGraph() })
 watch(() => [graphStore.blocked, uiStore.highlightedPath, sessionStore.session?.current_airport, sessionStore.session?.visited], renderGraph, { deep: true })
 
 onMounted(() => {
   initLeaflet()
-  initCytoscape()
-
-  // Sync canvas size to leaflet container
-  const ro = new ResizeObserver(() => {
-    if (!cytoscapeEl.value || !leafletEl.value) return
-    cytoscapeEl.value.width  = leafletEl.value.clientWidth
-    cytoscapeEl.value.height = leafletEl.value.clientHeight
-    cy?.resize()
-    updateCyPositions()
-  })
-  ro.observe(leafletEl.value!)
-
+  // initial render if data already present
   if (graphStore.isLoaded) renderGraph()
+  // listen for animate-flight events
+  realtime.on('animate-flight', (p: any) => {
+    try { animateFlight(p.segment) } catch {}
+  })
 })
 
 onUnmounted(() => {
   map?.remove()
-  cy?.destroy()
+  nodesLayer = null; edgesLayer = null
+  realtime.off('animate-flight')
 })
+
+// animate an airplane marker along origin->dest segment
+function animateFlight(segment: any) {
+  if (!map) return
+  const start = nodeLatLng(segment.origin)
+  const end = nodeLatLng(segment.dest)
+  if (!start || !end) return
+  const s = start as L.LatLng
+  const e = end as L.LatLng
+
+  const latlngs = [start, end]
+  const durationMs = Math.max(1500, (segment.flight_time_min ?? 1) * 200) // scale
+
+  const planeIcon = L.divIcon({ className: 'plane-icon', html: '✈️', iconSize: [24,24] })
+  const marker = L.marker(start, { icon: planeIcon, pane: 'markerPane' }).addTo(map)
+
+  const startTime = performance.now()
+  // compute constant bearing from start->end (deg)
+  function computeBearing(a: L.LatLng, b: L.LatLng) {
+    const toRad = (n: number) => n * Math.PI / 180
+    const toDeg = (n: number) => n * 180 / Math.PI
+    const φ1 = toRad(a.lat), φ2 = toRad(b.lat)
+    const Δλ = toRad(b.lng - a.lng)
+    const y = Math.sin(Δλ) * Math.cos(φ2)
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ)
+    const θ = Math.atan2(y, x)
+    return (toDeg(θ) + 360) % 360
+  }
+  const bearing = computeBearing(s, e)
+  function step(now: number) {
+    const t = Math.min(1, (now - startTime) / durationMs)
+    const lat = s.lat + (e.lat - s.lat) * t
+    const lng = s.lng + (e.lng - s.lng) * t
+    marker.setLatLng([lat, lng])
+    // rotate plane element to match bearing
+    const el = marker.getElement()
+    if (el) {
+      // translate to center then rotate
+      (el as HTMLElement).style.transform = `translate(-50%, -50%) rotate(${bearing}deg)`
+    }
+    if (t < 1) requestAnimationFrame(step)
+    else setTimeout(() => { marker.remove() }, 500)
+  }
+  requestAnimationFrame(step)
+}
 </script>
 
 <style scoped>
@@ -262,6 +185,7 @@ onUnmounted(() => {
 .leaflet-map { position: absolute; inset: 0; z-index: 1 }
 .cytoscape-overlay {
   position: absolute; inset: 0; z-index: 2;
-  pointer-events: auto; background: transparent;
+  pointer-events: none; background: transparent;
 }
+.plane-icon { display:inline-block; font-size:18px; line-height:24px; transform-origin:center center }
 </style>

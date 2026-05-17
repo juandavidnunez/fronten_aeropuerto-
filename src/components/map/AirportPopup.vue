@@ -16,32 +16,32 @@
 
     <div class="popup-grid">
       <div class="stat">
-        <span class="stat-label">Lodging / night</span>
+        <span class="stat-label">Alojamiento / noche</span>
         <span class="stat-val text-gold">${{ airport.lodging_cost }}</span>
       </div>
       <div class="stat">
-        <span class="stat-label">Food / meal</span>
+        <span class="stat-label">Comida / comida</span>
         <span class="stat-val text-gold">${{ airport.food_cost }}</span>
       </div>
       <div class="stat">
-        <span class="stat-label">Timezone</span>
+        <span class="stat-label">Zona horaria</span>
         <span class="stat-val mono">{{ airport.timezone }}</span>
       </div>
       <div class="stat">
-        <span class="stat-label">Airlines</span>
+        <span class="stat-label">Aerolíneas</span>
         <span class="stat-val">{{ airport.airlines.length }}</span>
       </div>
     </div>
 
     <div v-if="airport.airlines.length" class="section">
-      <div class="section-title">Airlines</div>
+      <div class="section-title">Aerolíneas</div>
       <div class="airline-list">
         <span v-for="a in airport.airlines" :key="a" class="airline-chip">{{ a }}</span>
       </div>
     </div>
 
     <div v-if="airport.activities.length" class="section">
-      <div class="section-title">Activities ({{ airport.activities.length }})</div>
+      <div class="section-title">Actividades ({{ airport.activities.length }})</div>
       <div v-for="act in airport.activities" :key="act.name" class="activity-row">
         <span class="activity-name">{{ act.name }}</span>
         <span :class="act.type === 'opcional' ? 'badge badge-ok' : 'badge badge-warn'">
@@ -53,11 +53,11 @@
     </div>
 
     <div v-if="airport.jobs.length" class="section">
-      <div class="section-title">Jobs available</div>
+      <div class="section-title">Trabajos disponibles</div>
       <div v-for="j in airport.jobs" :key="j.name" class="activity-row">
         <span class="activity-name">{{ j.name }}</span>
         <span class="text-green">${{ j.hourly_rate }}/h</span>
-        <span class="text-muted">max {{ j.max_hours }}h</span>
+        <span class="text-muted">máx {{ j.max_hours }}h</span>
       </div>
     </div>
   </div>
