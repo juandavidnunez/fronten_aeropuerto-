@@ -21,8 +21,11 @@ export const useGraphStore = defineStore('graph', () => {
       airports.value = await graphApi.nodes()
       routes.value   = await graphApi.edges()
       blocked.value  = await eventsApi.blocked()
-      // graph loaded; UI may connect to realtime for live updates
-    } catch (e: any) { error.value = e.message }
+    } catch (e: any) {
+      error.value = e.message?.includes('Network Error')
+        ? 'No se pudo conectar al backend. Inicia el servidor Python en el puerto 8000.'
+        : e.message
+    }
     finally { loading.value = false }
   }
 

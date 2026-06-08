@@ -37,12 +37,27 @@ export interface FlightOption {
   aircraft_options: AircraftOption[]; recommended_aircraft: AircraftOption
 }
 export interface ActivityOption { name: string; type: string; duration_min: number; cost_usd: number; can_afford: boolean }
-export interface JobOption { name: string; hourly_rate: number; max_hours: number; max_earnable_usd: number }
+export interface JobOption {
+  name: string; hourly_rate: number; max_hours: number; max_earnable_usd: number
+  recommended_hours?: number | null
+  estimated_living_cost?: number
+  estimated_net_income?: number
+  is_recommended?: boolean
+  recommendation_reason?: string | null
+}
+export interface JobRecommendation {
+  name: string; hourly_rate: number; recommended_hours: number
+  estimated_income: number; estimated_living_cost: number; net_gain: number; reason: string
+}
 export interface FlyResult {
   segment: TripSegment; mandatory_events: string[]; budget_remaining: number
   time_remaining_hours: number; current_airport: string; visited: string[]
 }
-export interface Suggestion { suggested_dest: string | null; path: string[]; estimated_cost: number; estimated_time_min: number }
+export interface Suggestion {
+  suggested_dest: string | null; path: string[]; estimated_cost: number; estimated_time_min: number
+  needs_jobs?: boolean; budget_deficit?: number; cheapest_flight_cost?: number
+  job_recommendations?: JobRecommendation[]
+}
 
 // R4
 export interface BlockedRoute { origin: string; dest: string }

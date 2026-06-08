@@ -60,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useGraphStore } from '@/stores/graph.store'
 import { useUiStore } from '@/stores/ui.store'
 
@@ -69,6 +69,10 @@ const uiStore    = useUiStore()
 
 const search  = ref('')
 const hubOnly = ref(false)
+
+onMounted(async () => {
+  if (!graphStore.isLoaded) await graphStore.load()
+})
 
 async function load() { await graphStore.load() }
 

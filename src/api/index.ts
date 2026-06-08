@@ -13,6 +13,15 @@ import type {
 
 const http = axios.create({ baseURL: '/api/v1' })
 
+http.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const body = err.response?.data
+    const msg = body?.error ?? err.message ?? 'Request failed'
+    return Promise.reject(new Error(msg))
+  },
+)
+
 async function unwrap<T>(p: Promise<{ data: ApiResponse<T> }>): Promise<T> {
   const { data: env } = await p
   if (env.error) throw new Error(env.error)
