@@ -106,10 +106,14 @@ export const useSessionStore = defineStore('session', () => {
       return r
     } catch (e: any) {
       if (e.message === 'ROUTE_BLOCKED') {
-        eventLog.value.push(`⚠ Ruta ${origin}→${dest} bloqueada durante el vuelo — regreso a ${origin}`)
-        error.value = 'Vuelo interrumpido: la ruta fue bloqueada. Permaneces en el aeropuerto de origen.'
+        eventLog.value.push(`⚠ Ruta ${origin}→${dest} bloqueada durante el vuelo`)
+        eventLog.value.push(`🚨 Activando desvío de emergencia...`)
+        error.value = 'Vuelo interrumpido: la ruta fue bloqueada durante el vuelo. Se ha activado un desvío de emergencia.'
+        // Actualizar la sesión después del desvío
+        await _refreshAll()
       } else {
         error.value = e.message
+        eventLog.value.push(`❌ Error en vuelo: ${e.message}`)
       }
       return null
     } finally {
